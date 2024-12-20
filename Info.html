@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irfan Aviator Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #1a1a1a;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 50px;
+            color: #FFD700;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        #gameCanvas {
+            width: 600px;
+            height: 400px;
+            background-color: #2c3e50;
+            border: 2px solid #FFD700;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .control-panel {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background-color: #FFD700;
+            color: #1a1a1a;
+            font-size: 18px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            background-color: #FF8C00;
+        }
+
+        .bet-input, .add-funds-input {
+            margin-top: 20px;
+            background-color: #34495e;
+            border: 2px solid #FFD700;
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            color: #FFD700;
+        }
+
+        .status-display {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .multiplier-display {
+            color: #FFD700;
+        }
+
+        .cash-out-display {
+            color: #e74c3c;
+        }
+
+        .balance-display {
+            margin-top: 20px;
+            font-size: 22px;
+            color: #2ecc71;
+        }
+
+        .withdrawal-form {
+            display: none;
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            margin-top: 30px;
+            color: #FFD700;
+        }
+
+        .withdrawal-form input {
+            background-color: #2c3e50;
+            border: 2px solid #FFD700;
+            padding: 10px;
+            margin-bottom: 10px;
+            width: 100%;
+            border-radius: 5px;
+            color: #FFD700;
+        }
+
+        .withdrawal-form button {
+            background-color: #FF6347;
+            color: white;
+            font-size: 18px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .withdrawal-form button:hover {
+            background-color: #FF4500;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Irfan Aviator Game</h1>
+<canvas id="gameCanvas"></canvas>
+
+<div class="control-panel">
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="cashOut()">Cash Out</button>
+    <button onclick="withdraw()">Withdraw</button>
+</div>
+
+<input class="bet-input" id="betInput" type="number" placeholder="Enter your bet" />
+<input class="add-funds-input" id="addFundsInput" type="number" placeholder="Add Funds" />
+
+<div class="status-display">
+    <div class="multiplier-display">Multiplier: 1.00x</div>
+    <div class="cash-out-display">Cash Out Amount: ₹0.00</div>
+</div>
+
+<div class="balance-display">
+    <div>Balance: ₹<span id="balance">0.00</span></div>
+</div>
+
+<!-- Withdrawal Form -->
+<div class="withdrawal-form" id="withdrawalForm">
+    <h3>Enter Bank Details</h3>
+    <input type="text" id="bankName" placeholder="Bank Name" />
+    <input type="text" id="accountHolder" placeholder="Account Holder Name" />
+    <input type="text" id="accountNumber" placeholder="Account Number" />
+    <button onclick="processWithdrawal()">Submit Withdrawal</button>
+</div>
+
+<script>
+    let canvas = document.getElementById("gameCanvas");
+    let ctx = canvas.getContext("2d");
+
+    let planeX = 0;
+    let planeY = 200;
+    let speed = 0.1;
+    let multiplier = 1;
+    let crashPoint = 0;
+    let gameRunning = false;
+    let betAmount = 0;
+    let cashOutAmount = 0;
+    let balance = 0;
+
+    // Add funds functionality
+    document.getElementById("addFundsInput").addEventListener("input", function() {
+        let amount = parseFloat(this.value);
+        if (!isNaN(amount) && amount > 0) {
+            balance += amount;
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            this.value = ""; // Reset input field after adding funds
+        }
+    });
+
+    // Start the game
+    function startGame() {
+        // Get the bet amount from the input field
+        betAmount = parseFloat(document.getElementById("betInput").value);
+        if (isNaN(betAmount) || betAmount <= 0) {
+            alert("Please enter a valid bet amount!");
+            return;
+        }
+
+        // Deduct the bet amount from the balance
+        if (betAmount > balance) {
+            alert("Insufficient balance to place this bet.");
+            return;
+        }
+
+        balance -= betAmount;
+        document.getElementById("balance").innerText = balance.toFixed(2);
+
+        gameRunning = true;
+        planeX = 0;
+        multiplier = 1;
+        crashPoint = Math.random() * (2.5 - 1) + 1; // Random crash point between 1x and 2.5x
+        speed = 0.1;
+        updateCanvas();
+        updateDisplay();
+    }
+
+    // Update canvas and plane movement
+    function updateCanvas() {
+        if (!gameRunning) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw plane (represented as a red circle)
+        ctx.beginPath();
+        ctx.arc(planeX, planeY, 15, 0, Math.PI * 2);
+        ctx.fillStyle = "#FF6347";
+        ctx.fill();
+
+        // Update multiplier and plane position
+        planeX += speed;
+        multiplier += 0.01;
+
+        // Display multiplier on canvas
+        ctx.fillStyle = "#FFD700";
+        ctx.font = "24px Arial";
+        ctx.fillText("Multiplier: " + multiplier.toFixed(2), canvas.width / 2 - 80, 40);
+
+        // Random crash simulation
+        if (multiplier >= crashPoint) {
+            gameRunning = false;
+            alert("Crash! Final Multiplier: " + multiplier.toFixed(2));
+            cashOutAmount = 0;
+            updateDisplay();
+        }
+
+        // Keep updating the canvas every frame
+        requestAnimationFrame(updateCanvas);
+    }
+
+    // Cash Out functionality
+    function cashOut() {
+        if (gameRunning) {
+            gameRunning = false;
+            cashOutAmount = (betAmount * multiplier).toFixed(2);
+            balance += parseFloat(cashOutAmount);
+            alert("You Cashed Out! Your final amount is: ₹" + cashOutAmount);
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            updateDisplay();
+        } else {
+            alert("Game is not running.");
+        }
+    }
+
+    // Withdraw functionality
+    function withdraw() {
+        if (balance > 0) {
+            // Show the withdrawal form when the player has balance
+            document.getElementById("withdrawalForm").style.display = "block";
+        } else {
+            alert("You have no balance to withdraw.");
+        }
+    }
+
+    // Process Withdrawal after receiving bank details
+    function processWithdrawal() {
+        const bankName = document.getElementById("bankName").value;
+        const accountHolder = document.getElementById("accountHolder").value;
+        const accountNumber = document.getElementById("accountNumber").value;
+
+        if (bankName && accountHolder && accountNumber) {
+            alert("Withdrawal request processed for ₹" + balance.toFixed(2));
+            balance = 0;
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            document.getElementById("withdrawalForm").style.display = "none";
+        } else {
+            alert("Please fill in all fields.");
+        }
+    }
+
+    function updateDisplay() {
+        document.querySelector(".cash-out-display").innerText = "Cash Out Amount: ₹" + cashOutAmount;
+    }
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irfan Aviator Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #1a1a1a;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 50px;
+            color: #FFD700;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        #gameCanvas {
+            width: 600px;
+            height: 400px;
+            background-color: #2c3e50;
+            border: 2px solid #FFD700;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .control-panel {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background-color: #FFD700;
+            color: #1a1a1a;
+            font-size: 18px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            background-color: #FF8C00;
+        }
+
+        .bet-input, .add-funds-input {
+            margin-top: 20px;
+            background-color: #34495e;
+            border: 2px solid #FFD700;
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            color: #FFD700;
+        }
+
+        .status-display {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .multiplier-display {
+            color: #FFD700;
+        }
+
+        .cash-out-display {
+            color: #e74c3c;
+        }
+
+        .balance-display {
+            margin-top: 20px;
+            font-size: 22px;
+            color: #2ecc71;
+        }
+
+        .withdrawal-form {
+            display: none;
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            margin-top: 30px;
+            color: #FFD700;
+        }
+
+        .withdrawal-form input {
+            background-color: #2c3e50;
+            border: 2px solid #FFD700;
+            padding: 10px;
+            margin-bottom: 10px;
+            width: 100%;
+            border-radius: 5px;
+            color: #FFD700;
+        }
+
+        .withdrawal-form button {
+            background-color: #FF6347;
+            color: white;
+            font-size: 18px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .withdrawal-form button:hover {
+            background-color: #FF4500;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Irfan Aviator Game</h1>
+<canvas id="gameCanvas"></canvas>
+
+<div class="control-panel">
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="cashOut()">Cash Out</button>
+    <button onclick="withdraw()">Withdraw</button>
+</div>
+
+<input class="bet-input" id="betInput" type="number" placeholder="Enter your bet" />
+<input class="add-funds-input" id="addFundsInput" type="number" placeholder="Add Funds" />
+
+<div class="status-display">
+    <div class="multiplier-display">Multiplier: 1.00x</div>
+    <div class="cash-out-display">Cash Out Amount: ₹0.00</div>
+</div>
+
+<div class="balance-display">
+    <div>Balance: ₹<span id="balance">0.00</span></div>
+</div>
+
+<!-- Withdrawal Form -->
+<div class="withdrawal-form" id="withdrawalForm">
+    <h3>Enter Bank Details</h3>
+    <input type="text" id="bankName" placeholder="Bank Name" />
+    <input type="text" id="accountHolder" placeholder="Account Holder Name" />
+    <input type="text" id="accountNumber" placeholder="Account Number" />
+    <button onclick="processWithdrawal()">Submit Withdrawal</button>
+</div>
+
+<script>
+    let canvas = document.getElementById("gameCanvas");
+    let ctx = canvas.getContext("2d");
+
+    let planeX = 0;
+    let planeY = 200;
+    let speed = 0.1;
+    let multiplier = 1;
+    let crashPoint = 0;
+    let gameRunning = false;
+    let betAmount = 0;
+    let cashOutAmount = 0;
+    let balance = 0;
+
+    // Add funds functionality
+    document.getElementById("addFundsInput").addEventListener("input", function() {
+        let amount = parseFloat(this.value);
+        if (!isNaN(amount) && amount > 0) {
+            balance += amount;
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            this.value = ""; // Reset input field after adding funds
+        }
+    });
+
+    // Start the game
+    function startGame() {
+        // Get the bet amount from the input field
+        betAmount = parseFloat(document.getElementById("betInput").value);
+        if (isNaN(betAmount) || betAmount <= 0) {
+            alert("Please enter a valid bet amount!");
+            return;
+        }
+
+        // Deduct the bet amount from the balance
+        if (betAmount > balance) {
+            alert("Insufficient balance to place this bet.");
+            return;
+        }
+
+        balance -= betAmount;
+        document.getElementById("balance").innerText = balance.toFixed(2);
+
+        gameRunning = true;
+        planeX = 0;
+        multiplier = 1;
+        crashPoint = Math.random() * (2.5 - 1) + 1; // Random crash point between 1x and 2.5x
+        speed = 0.1;
+        updateCanvas();
+        updateDisplay();
+    }
+
+    // Update canvas and plane movement
+    function updateCanvas() {
+        if (!gameRunning) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw plane (represented as a red circle)
+        ctx.beginPath();
+        ctx.arc(planeX, planeY, 15, 0, Math.PI * 2);
+        ctx.fillStyle = "#FF6347";
+        ctx.fill();
+
+        // Update multiplier and plane position
+        planeX += speed;
+        multiplier += 0.01;
+
+        // Display multiplier on canvas
+        ctx.fillStyle = "#FFD700";
+        ctx.font = "24px Arial";
+        ctx.fillText("Multiplier: " + multiplier.toFixed(2), canvas.width / 2 - 80, 40);
+
+        // Random crash simulation
+        if (multiplier >= crashPoint) {
+            gameRunning = false;
+            alert("Crash! Final Multiplier: " + multiplier.toFixed(2));
+            cashOutAmount = 0;
+            updateDisplay();
+        }
+
+        // Keep updating the canvas every frame
+        requestAnimationFrame(updateCanvas);
+    }
+
+    // Cash Out functionality
+    function cashOut() {
+        if (gameRunning) {
+            gameRunning = false;
+            cashOutAmount = (betAmount * multiplier).toFixed(2);
+            balance += parseFloat(cashOutAmount);
+            alert("You Cashed Out! Your final amount is: ₹" + cashOutAmount);
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            updateDisplay();
+        } else {
+            alert("Game is not running.");
+        }
+    }
+
+    // Withdraw functionality
+    function withdraw() {
+        if (balance > 0) {
+            // Show the withdrawal form when the player has balance
+            document.getElementById("withdrawalForm").style.display = "block";
+        } else {
+            alert("You have no balance to withdraw.");
+        }
+    }
+
+    // Process Withdrawal after receiving bank details
+    function processWithdrawal() {
+        const bankName = document.getElementById("bankName").value;
+        const accountHolder = document.getElementById("accountHolder").value;
+        const accountNumber = document.getElementById("accountNumber").value;
+
+        if (bankName && accountHolder && accountNumber) {
+            alert("Withdrawal request processed for ₹" + balance.toFixed(2));
+            balance = 0;
+            document.getElementById("balance").innerText = balance.toFixed(2);
+            document.getElementById("withdrawalForm").style.display = "none";
+        } else {
+            alert("Please fill in all fields.");
+        }
+    }
+
+    function updateDisplay() {
+        document.querySelector(".cash-out-display").innerText = "Cash Out Amount: ₹" + cashOutAmount;
+    }
+</script>
+
+</body>
+</html>
